@@ -1,0 +1,48 @@
+RelativeURLs=true
+CanonifyURLs=true
+languageCode = "en-US"
+defaultContentLanguage = "en"
+enableInlineShortcodes=true
+
+title = "Redshift Immersion Labs"
+theme = "learn"
+metaDataFormat = "yaml"
+
+uglyurls = true
+sectionPagesMenu = "main"
+pygmentsCodeFences = true
+pygmentsStyle = "monokai"
+
+[params]
+  description = "Redshift Immersion Labs"
+  author = "Rajiv Gupta"
+  disableBreadcrumb = false
+  disableNextPrev = false
+  themeVariant = "aws"
+  disableSearch = false
+  disableAssetsBusting = true
+  disableLanguageSwitchingButton = false
+  disableShortcutsTitle = true
+  disableInlineCopyToClipBoard = true
+  awsRegion = 'us-east-1'
+  kinesisStreamName = "redshift-immersion-events"
+  cognitoPoolId = "us-east-1:4a4eb7fe-1199-43a4-85c0-08973fa20877"
+  contentVersion = "1.0"
+
+[outputs]
+home = [ "HTML", "RSS", "JSON"]
+
+[blackfriday]
+plainIDAnchors = true
+hrefTargetBlank = true
+
+[Languages]
+[Languages.en]
+title = "Redshift Immersion Labs"
+weight = 1
+languageName = "English"
+
+[Languages.fr]
+title = "Redshift Immersion Labs"
+weight = 2
+languageName = "French"
