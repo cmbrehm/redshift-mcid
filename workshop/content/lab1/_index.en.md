@@ -74,35 +74,15 @@ Once again, please don't do this in any environment that's more important than a
 
 Leave the remaining settings with their default values.  Click **Create Cluster** to launch the Redshift cluster.
 
-## Configure Client Tool
-* While Amazon Redshift does provide a web-based [Query editor](https://console.aws.amazon.com/redshift/home?#query:) for executing simple queries, for these labs, it is recommended you install a third-party tool.  We will use [SQL Workbench/J](http://www.sql-workbench.net).
-* Navigate to the [SQL Workbench/J Downloads Page](https://www.sql-workbench.eu/downloads.html) and click on the `Generic package for all systems` link to download the latest version of the SQL Workbench/J product.  Note: SQL Workbench/J requires Java 8 or later to be installed on your system.
-* Extract the downloaded zip file into a directory of your choice.
-* If using a Windows machine.  Execute the `SQLWorkbench.exe` program.
-* If using a Mac or Unix system.  Open the `Terminal` app, `cd` to the extract directory, type `bash sqlworkbench.sh` and press enter.
-* If this fails to run and you do not have java running on your system, you may need to download and install it.   See the following site for options: https://www.codejava.net/java-se/download-and-install-jdk-14-openjdk-and-oracle-jdk
-* Once running, navigate to the following location to download the latest JDBC driver: [Configure JDBC Connection](https://docs.aws.amazon.com/redshift/latest/mgmt/configure-jdbc-connection.html#jdbc-previous-versions-with-sdk).
-* Launch SQL Workbench/J and navigate to ``[File | Manage Drivers]``.
-* Select `Amazon Redshift` and set the driver Library location to where you downloaded the Redshift JDBC Driver. Click Ok.
-![](../images/Library.png)
-* Navigate to [File | Connect Window] to create a new connection profile and modify the following settings and once complete click on the "Test Connection" button.
-  * Name - "LabConnection"
-  * Driver - Amazon Redshift (com.amazon.redshift.jdbc.Driver)
-  * URL - Find this by navigating to the [Cluster List](https://console.aws.amazon.com/redshiftv2/home?#clusters), selecting your cluster, clicking on **Properties** and copying the **Endpoint** located in the **Connection details**.  
-  ![](../images/JDBCUrl.png)
-  * Username - [Master user name]
-  * Password - [Master user password]
-  * Autocommit - Enabled
-
-![](../images/Connection.png)
-
 ## Run Sample Query
+Wait for the cluster to become **Available**.  Select it with the selection box next to it and click **Query cluster** to open the query interface.
 * Run the following query to list the users within the redshift cluster.  
 ```
 select * from pg_user
 ```
+* Click **Connect and Run** to open the connection box.
+* Enter the *database name (dev)* and *user name (aws_user)* in the dialog that opens
+* Click **Connect**
+
 * If you receive the following results, you have established connectivity and this lab is complete.  
 ![](../images/Users.png)
-
-## Before You Leave
-If you are done using your cluster, please think about decommissioning it to avoid having to pay for unused resources.

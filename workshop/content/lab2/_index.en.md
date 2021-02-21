@@ -8,8 +8,6 @@ pre = "<b>2. </b>"
 In this lab, you will use a set of eight tables based on the TPC Benchmark data model.  You create these tables within your Redshift cluster and load these tables with sample data stored in S3.  
 
 ## Contents
-* [Before You Begin](#before-you-begin)
-* [Cloud Formation](#cloud-formation)
 * [Create Tables](#create-tables)
 * [Loading Data](#loading-data)
 * [Table Maintenance - ANALYZE](#table-maintenance---analyze)
@@ -17,45 +15,10 @@ In this lab, you will use a set of eight tables based on the TPC Benchmark data 
 * [Troubleshooting Loads](#troubleshooting-loads)
 * [Before You Leave](#before-you-leave)
 
-## Before You Begin
-This lab assumes you have launched a Redshift cluster and can gather the following information.  If you have not launched a cluster, see [LAB 1 - Creating Redshift Clusters](../lab1.html).
-* [Your-AWS_Account_Id]
-* [Your-Redshift_Hostname]
-* [Your-Redshift_Port]
-* [Your-Redshift_Username]
-* [Your-Redshift_Password]
-* [Your-Redshift-Role]
-
-It also assumes you have access to a configured client tool. For more details on configuring SQL Workbench/J as your client tool, see [Lab 1 - Creating Redshift Clusters : Configure Client Tool](../lab1.html#configure-client-tool). As an alternative you can use the Redshift provided online Query Editor which does not require an installation.
-```
-https://console.aws.amazon.com/redshift/home?#query:
-```
-
-## Cloud Formation
-To *skip this lab* and complete the loading of this sample data into an **existing cluster** using cloud formation, use the following link.
-
-[![Launch](../images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/new?stackName=ImmersionLab2&templateURL=https://s3-us-west-2.amazonaws.com/redshift-immersionday-labs/lab2.yaml)
-
-To *skip this lab* and complete the loading of this sample data into a **new cluster** using cloud formation, use the following link.
-
-[![Launch](../images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/new?stackName=ImmersionLab2&templateURL=https://s3-us-west-2.amazonaws.com/redshift-immersionday-labs/lab2%2Bcluster.yaml)
-
-{{% notice note %}}
-These cloud formation templates will create a Lambda function which will trigger an asynchronous Glue Python Shell script.  To monitor the load process and diagnose any load errors, see the Cloudwatch Logs stream.
-{{% /notice %}}
-
-{{% notice note %}}
-When choosing a Region for your cluster, consider *US-WEST-2 (Oregon)*.  While most of these labs can be done in any Region, some labs query data in S3 which is located in *US-WEST-2*.
-{{% /notice %}}
-
-{{% notice note %}}
-The template will use the default CIDR block of 0.0.0.0/0 which provides access from any IP Address.  It is a best practice to replace this a range of IP addresses which should have access.  For the purpose of these labs, replace it with your IP Address x.x.x.x/32.
-{{% /notice %}}
-
 ## Create Tables
 
 {{% notice warning %}}
-The query editor only runs short queries that can complete within 10 minutes. Query result sets are paginated with 100 rows per page. 
+The query editor only runs short queries that can complete within 10 minutes. Query result sets are paginated with 100 rows per page.
 {{% /notice %}}
 
 Copy the following create table statements to create tables in the database mimicking the TPC Benchmark data model.
@@ -159,56 +122,63 @@ create table partsupp (
   PS_COMMENT varchar(199))
 diststyle even;
 ```
+
+* Select the **public** schema from the dropdown under Resources->Select Schema
+* Paste the above into the query box and click **Run**
+
+The tables should appear as Resources.
+
 ## Loading Data
 A COPY command loads large amounts of data much more efficiently than using INSERT statements, and stores the data more effectively as well.  Use a single COPY command to load data for one table from multiple files.  Amazon Redshift then automatically loads the data in parallel.  For your convenience, the sample data you will use is available in a public Amazon S3 bucket. To ensure that  Redshift performs a compression analysis, set the COMPUPDATE parameter to ON in your COPY commands. To copy this data you will need to replace the [Your-AWS_Account_Id] and [Your-Redshift_Role] values in the script below.
 
 ```
 COPY region FROM 's3://redshift-immersionday-labs/data/region/region.tbl.lzo'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 COPY nation FROM 's3://redshift-immersionday-labs/data/nation/nation.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 copy customer from 's3://redshift-immersionday-labs/data/customer/customer.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 copy orders from 's3://redshift-immersionday-labs/data/orders/orders.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 copy part from 's3://redshift-immersionday-labs/data/part/part.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 copy supplier from 's3://redshift-immersionday-labs/data/supplier/supplier.json' manifest
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
-region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
-
-copy lineitem from 's3://redshift-immersionday-labs/data/lineitem/lineitem.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
 copy partsupp from 's3://redshift-immersionday-labs/data/partsupp/partsupp.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 ```
-If you are using 4 dc2.large clusters nodes, the estimated time to load the data is as follows, note you can check timing information on actions in the performance and query tabs on the redshift console:
+The estimated time to load the data is as follows:
+
 * REGION (5 rows) - 20s
 * NATION (25 rows) - 20s
 *	CUSTOMER (15M rows) – 3m
 * ORDERS - (76M rows) - 1m
 * PART - (20M rows) - 4m
 *	SUPPLIER - (1M rows) - 1m
-* LINEITEM - (600M rows) - 13m
 *	PARTSUPPLIER - (80M rows) 3m
 
+{{% notice note %}}
+This load should finish in about 15 minutes.  You can monitor the progress in the queries tab on the left menu bar
+{{% /notice %}}
 Note: A few key takeaways from the above COPY statements.
 1. COMPUPDATE PRESET ON will assign compression using the Amazon Redshift best practices related to the data type of the column but without analyzing the data in the table.
 1. COPY for the REGION table points to a specfic file (region.tbl.lzo) while COPY for other tables point to a prefix to multiple files (lineitem.tbl.)
 1. COPY for the SUPPLIER table points a manifest file (supplier.json)
+
+
 
 ## Table Maintenance - Analyze
 You should at regular intervals, update the statistical metadata that the query planner uses to build and choose optimal plans.  You can analyze a table explicitly by running the ANALYZE command.  When you load data with the COPY command, you can perform an analysis on incrementally loaded data automatically by setting the STATUPDATE option to ON.  When loading into an empty table, the COPY command by default performs the ANALYZE operation.
@@ -233,23 +203,19 @@ You should run the VACUUM command following a significant number of deletes or u
 
 Capture the initial space usage of the ORDERS table.
 ```
-select col, count(*)
+select sum(blocks) as total_space from
+(select col, count(*) as blocks
 from stv_blocklist, stv_tbl_perm
 where stv_blocklist.tbl = stv_tbl_perm.id and
 stv_blocklist.slice = stv_tbl_perm.slice and
-stv_tbl_perm.name = 'orders' and
-col <= 5
+stv_tbl_perm.name = 'orders'
 group by col
-order by col;
+)
 ```
-|col|count|
-|---|---|
-|0|280|
-|1|248|
-|2|24|
-|3|304|
-|4|312|
-|5|208|
+
+{{% notice note %}}
+STV_BLOCKLIST contains the number of 1 MB disk blocks that are used by each slice, table, or column in a database.  Use aggregate queries with STV_BLOCKLIST, as the following examples show, to determine the number of 1 MB disk blocks allocated per database, table, slice, or column.
+{{% /notice %}}
 
 Delete rows from the ORDERS table.
 ```
@@ -258,15 +224,14 @@ delete orders where o_orderdate between '1997-01-01' and '1998-01-01';
 
 Confirm that Redshift did not automatically reclaim space by running the following query again and noting the values have not changed.
 ```
-select col, count(*)
+select sum(blocks) as total_space from
+(select col, count(*) as blocks
 from stv_blocklist, stv_tbl_perm
-where stv_blocklist.tbl = stv_tbl_perm.id
-and stv_blocklist.slice = stv_tbl_perm.slice
-and stv_tbl_perm.name = 'orders' and
-col <= 5
+where stv_blocklist.tbl = stv_tbl_perm.id and
+stv_blocklist.slice = stv_tbl_perm.slice and
+stv_tbl_perm.name = 'orders'
 group by col
-order by col;
-
+)
 ```
 
 Run the VACUUM command
@@ -276,24 +241,16 @@ vacuum delete only orders;
 
 Confirm that the VACUUM command reclaimed space by running the follwoing quer again and noting the values have changed.
 ```
-select col, count(*)
+select sum(blocks) as total_space from
+(select col, count(*) as blocks
 from stv_blocklist, stv_tbl_perm
-where stv_blocklist.tbl = stv_tbl_perm.id
-and stv_blocklist.slice = stv_tbl_perm.slice
-and stv_tbl_perm.name = 'orders' and
-col <= 5
+where stv_blocklist.tbl = stv_tbl_perm.id and
+stv_blocklist.slice = stv_tbl_perm.slice and
+stv_tbl_perm.name = 'orders'
 group by col
-order by col;
+)
 ```
 
-|col|count|
-|---|---|
-|0|244|
-|1|216|
-|2|24|
-|3|264|
-|4|272|
-|5|184|
 
 Note:  If you have a table with very few columns but a very large number of rows, the three hidden metadata identify columns (INSERT_XID, DELETE_XID, ROW_ID) will consume a disproportionate amount of the disk space for the table.  In order to optimize compression of the hidden columns, load the table in a single copy transaction where possible.  If you load the table with multiple separate COPY commands, the INSERT_XID column will not compress well and multiple vacuum operations will not improve compression of INSERT_XID.
 
@@ -307,7 +264,7 @@ In addition, you can validate your data without actually loading the table.  Use
 Let’s try to load the CUSTOMER table with a different data file with mismatched columns.  To copy this data you will need to replace the [Your-AWS_Account_Id] and [Your-Redshift_Role] values in the script below.   
 ```
 COPY customer FROM 's3://redshift-immersionday-labs/data/nation/nation.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/[Your-Redshift-Role]'
+iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' noload;
 ```
 
@@ -333,6 +290,3 @@ where sl.tbl = sp.id);
 -- Query the LOADVIEW view to isolate the problem.
 select * from loadview where table_name='customer';
 ```
-
-## Before You Leave
-If you are done using your cluster, please think about decommissioning it to avoid having to pay for unused resources.
