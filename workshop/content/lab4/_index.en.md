@@ -8,7 +8,7 @@ pre = "<b>3. </b>"
 In this lab, we show you how to combine "hot" data stored in Amazon Redshift with "warm" data in your Amazon S3 data lake - without loading or moving objects. We will also demonstrate how you can leverage views which union data in these different data stores.  Finally, we demonstrate strategies for aging off old data into S3 and maintaining only the most recent data in Amazon Redshift direct attached storage.
 
 ## Contents
-* [Inspect The Data] (#inspect-the-data)
+* [Inspect The Data](#inspect-the-data)
 * [COPY Data from S3](#what-happened-in-2016)
 * [CREATE TABLE directly against S3 Data Lake](#go-back-in-time)
 * [Create a Single Version of Truth](#create-a-single-version-of-truth)
