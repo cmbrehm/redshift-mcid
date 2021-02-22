@@ -1,35 +1,40 @@
 +++
 title = "Modernize w/ Spectrum"
 date = 2020-01-22T16:27:02-08:00
-weight = 4
-pre = "<b>4. </b>"
+weight = 3
+pre = "<b>3. </b>"
 +++
 
-In this lab, we show you how to query petabytes of data with Amazon Redshift and exabytes of data in your Amazon S3 data lake, without loading or moving objects. We will also demonstrate how you can leverage views which union data in direct attached storage as well as in your S3 Datalake to create a single source of truth.  Finally, we will demonstrate strategies for aging off old data into S3 and maintaining only the most recent data in Amazon Redshift direct attached storage.
+In this lab, we show you how to combine "hot" data stored in Amazon Redshift with "warm" data in your Amazon S3 data lake - without loading or moving objects. We will also demonstrate how you can leverage views which union data in these different data stores.  Finally, we demonstrate strategies for aging off old data into S3 and maintaining only the most recent data in Amazon Redshift direct attached storage.
 
 ## Contents
-* [Before You Begin](#before-you-begin)
-* [What Happened in 2016](#what-happened-in-2016)
-* [Go Back In Time](#go-back-in-time)
+* [Inspect The Data] (#inspect-the-data)
+* [COPY Data from S3](#what-happened-in-2016)
+* [CREATE TABLE directly against S3 Data Lake](#go-back-in-time)
 * [Create a Single Version of Truth](#create-a-single-version-of-truth)
 * [Plan for the Future](#plan-for-the-future)
-* [Before You Leave](#before-you-leave)
 
-## Before You Begin
-This lab assumes you have launched a Redshift cluster in **US-WEST-2 (Oregon)**, and can gather the following information.  If you have not launched a cluster, see [LAB 1 - Creating Redshift Clusters](../lab1.html).  
-* [Your-Redshift_Hostname]
-* [Your-Redshift_Port]
-* [Your-Redshift_Username]
-* [Your-Redshift_Password]
-* [Your-Redshift_Role]
-* [Your-AWS-Account_Id]
+## Inspect The Data
+The data we'll use for this lab is stored in a public S3 bucket and represents rideshare data from a few different companies.  Note the partitioning scheme is Year, Month, Type (where Type is a taxi company).  Inspect the data and understand the partitioning.  Note the data has already been translated to parquet format so will not be easy to read.
 
-It also assumes you have access to a configured client tool. For more details on configuring SQL Workbench/J as your client tool, see [Lab 1 - Creating Redshift Clusters : Configure Client Tool](../lab1/README.md#configure-client-tool). As an alternative you can use the Redshift provided online Query Editor which does not require an installation.
-```
-https://console.aws.amazon.com/redshift/home?#query:
-```
+Here's a quick Screenshot:
 
-## What Happened in 2016
+````
+https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/
+````
+![](../images/canonical_year.png)
+````
+https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/
+````
+![](../images/canonical_month.png)
+````
+https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/month%253D1/
+````
+![](../images/canonical_type.png)
+
+
+
+## COPY Data from S3
 In the first part of this lab, we will perform the following activities:
 * Load the Green company data for January 2016 into Redshift direct-attached storage (DAS) with COPY.
 * Collect supporting/refuting evidence for the impact of the January, 2016 blizzard on taxi usage.
@@ -49,11 +54,10 @@ https://s3.console.aws.amazon.com/s3/object/us-west-2.serverless-analytics/NYC-P
 ### Build your DDL
 Create a schema `workshop_das` and table `workshop_das.green_201601_csv` for tables that will reside on the Redshift compute nodes, AKA the Redshift direct-attached storage (DAS) tables.
 
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
+{{% notice note %}}
+We are copying only one month's worth of data from one company into the Direct-Attached Storage.  In the subsequent steps, we'll use Redshift Spectrum to query the entire dataset.
 
+{{% /notice %}}
 ```python
 CREATE SCHEMA workshop_das;
 
@@ -84,23 +88,17 @@ CREATE TABLE workshop_das.green_201601_csv
 DISTSTYLE EVEN
 SORTKEY (passenger_count,pickup_datetime);
 ```
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
 ### Build your Copy Command
-* Build your copy command to copy the data from Amazon S3. This dataset has the number of taxi rides in the month of January 2016.
+* Build your copy command to copy the data from Amazon S3. This dataset has the number of taxi rides in the month of January 2016 for the Green company.
 
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
+{{% notice info %}}
+Recall the **COPY** command will load the data from S3 into the direct-attached storage on the Redshift side.  
+{{% /notice %}}
 
 ```python
 COPY workshop_das.green_201601_csv
 FROM 's3://us-west-2.serverless-analytics/NYC-Pub/green/green_tripdata_2016-01.csv'
-IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]'
+IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/RedshiftImmersionRole'
 DATEFORMAT 'auto'
 IGNOREHEADER 1
 DELIMITER ','
@@ -108,38 +106,16 @@ IGNOREBLANKLINES
 REGION 'us-west-2'
 ;
 ```
-
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
 * Determine how many rows you just loaded.
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
 
 ```
 select count(1) from workshop_das.green_201601_csv;
 --1445285
 ```
+**HINT: `[Your-AWS-Account_Id]` in the above command should be replaced with the values determined at the beginning of the lab.**
 
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
-**HINT: The `[Your-Redshift_Role]` and `[Your-AWS-Account_Id]` in the above command should be replaced with the values determined at the beginning of the lab.**
-
-### Pin-point the Blizzard
+### Pinpoint the Blizzard
 In this month, there is a date which had the lowest number of taxi rides due to a blizzard. Can you find that date?
-
-{{< html.inline >}}
-<details><summary>SQL-Based Hint</summary>
-<p>
-{{< /html.inline >}}
 
 ```python
 SELECT TO_CHAR(pickup_datetime, 'YYYY-MM-DD'),
@@ -149,14 +125,11 @@ GROUP BY 1
 ORDER BY 2;
 ```
 
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
+Note the query time spent on this query.  We will use it as a point of comparison against the data lake queries.
 
-## Go Back in Time
+## Create Table Directly Against S3 Data Lake
 In the next part of this lab, we will perform the following activities:
-* Query historical data residing on S3 by create an external DB for Redshift Spectrum.
+* Onboard "warm" historical data residing on S3 by building an external DB for Redshift Spectrum.
 * Introspect the historical data, perhaps rolling-up the data in novel ways to see trends over time, or other dimensions.
 * Enforce reasonable use of the cluster with Redshift Spectrum-specific Query Monitoring Rules (QMR).
 	* Test the QMR setup by writing an excessive-use query.
@@ -177,10 +150,10 @@ https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/cano
 ![](../images/canonical_type.png)
 
 
-### Create external schema (and DB) for Redshift Spectrum
-Because external tables are stored in a shared Glue Catalog for use within the AWS ecosystem, they can be built and maintained using a few different tools, e.g. Athena, Redshift, and Glue.
+### Use an AWS Glue Crawler to index the data lake
+[AWS Glue](https://aws.amazon.com/glue) is a serverless data integration service that makes it easy to discover, prepare, and combine data for analytics, machine learning, and application development. AWS Glue crawls your data sources, identifies data formats, and suggests schemas to store your data. It automatically generates the code to run your data transformations and loading processes.
 
-* Use the AWS Glue Crawler to create your external table adb305.ny_pub stored in parquet format under location s3://us-west-2.serverless-analytics/canonical/NY-Pub/.
+Today, we will use the AWS Glue Crawler to create your external table adb305.ny_pub stored in parquet format under location s3://us-west-2.serverless-analytics/canonical/NY-Pub/.
 
 	1. Navigate to the **Glue Crawler Page**. https://console.aws.amazon.com/glue/home?#catalog:tab=crawlers
 	![](../images/crawler_0.png)
@@ -198,37 +171,26 @@ Because external tables are stored in a shared Glue Catalog for use within the A
 	![](../images/crawler_6.png)
 	1. Select all remaining defaults. Once the Crawler has been created, click on *Run Crawler*.
 	![](../images/crawler_7.png)
-	1. Once the Crawler has completed its run, you will see a new table in the Glue Catalog. https://console.aws.amazon.com/glue/home?#catalog:tab=tables
+	1. Once the Crawler has completed its run (should only take a minute or two), you will see a new table in the Glue Catalog. https://console.aws.amazon.com/glue/home?#catalog:tab=tables
 	![](../images/crawler_8.png)
 	1. Click on the *ny_pub* table, notice the recordCount of 2.87 billion.
 	![](../images/crawler_9.png)
 
 
+### Create external schema (and DB) for Redshift Spectrum
 * Now that the table has been cataloged, switch back to your Redshift query editor and create an external schema **adb305** pointing to your Glue Catalog Database **spectrumdb**
 
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
+{{% notice info %}}
+CREATE EXTERNAL SCHEMA supports federated queries from Redshift.  You can use this external schema to connect to Amazon RDS for PostgreSQL or Amazon Aurora with PostgreSQL compatibility databases. You can also create an external schema that references a database in an external data catalog such as AWS Glue, Athena, or a database in an Apache Hive metastore, such as Amazon EMR.
+{{% /notice %}}
 
 ```python
 CREATE external SCHEMA adb305
 FROM data catalog DATABASE 'spectrumdb'
-IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]'
+IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/RedshiftImmersionRole'
 CREATE external DATABASE if not exists;
 ```
-
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
-* Run the query from the previous step using the external table instead of the direct-attached storage (DAS).
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
+* Let's query rollups for January 2016 again, this time using the external table.
 
 ```python
 SELECT TO_CHAR(pickup_datetime, 'YYYY-MM-DD'),
@@ -238,114 +200,59 @@ WHERE YEAR = 2016 and Month = 01
 GROUP BY 1
 ORDER BY 1;
 ```
+How long did this query take?  Check the **Execution timeline** for details
+![](../images/lab4-spectrum-execution.png)
 
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
+{{% notice info %}}
+With Redshift Spectrum, you are billed per terabyte of data scanned, rounded up to the next megabyte, with a 10 megabyte minimum per query.  Prices vary by region but start at $5.00 USD per terabyte in the US regions.  For example, if you scan 10 gigabytes of data, you will be charged $0.05. If you scan 1 terabyte of data, you will be charged $5.00.  
+{{% /notice %}}
+{{% notice note %}}
+You can improve query performance and reduce costs by storing data in a compressed, partitioned, columnar data format. If you compress data using one of Redshift Spectrum’s supported formats, your costs will go down because less data is scanned. Similarly, if you store data in a columnar format, such as Parquet or ORC, your charges will also go down because Redshift Spectrum only scans columns needed by the query.
+{{% /notice %}}
 
 ## Create a Single Version of Truth
-In the next part of this lab, we will demonstrate how to create a view which has data that is consolidated from S3 via Spectrum and the Redshift direct-attached storage.
+In the next part of this lab, we will demonstrate how to create a view which has data that is consolidated from S3 via Spectrum and the Redshift direct-attached storage.  An architecture like this would allow to keep "hot" data locally and let older data age off to S3.  In the next section we will discuss strategies to accomplish the aging.
 
-### Create a view
-Create a view that covers both the January, 2016 Green company DAS table with the historical data residing on S3 to make a single table exclusively for the Green data scientists. Use CTAS to create a table with data from January, 2016 for the Green company. Compare the runtime to populate this with the COPY runtime earlier.
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
+### Create a union view between Amazon Redshift and Redshift Spectrum
+ Use **Create Table As (CTAS)** to create a table with data from January 2016 for the Green company. Compare the runtime to populate this with the COPY runtime earlier.
 
 ```python
 CREATE TABLE workshop_das.taxi_201601 AS
 SELECT * FROM adb305.ny_pub
-WHERE year = 2016 AND month = 1 AND type = 'green';
+WHERE year = 2016 AND month = 1;
 ```
 
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
-Note: What about column compression/encoding? Remember that on a CTAS, Amazon Redshift automatically assigns compression encoding as follows:
+Note: What about column compression/encoding? Remember that on a [CREATE TABLE AS](https://docs.aws.amazon.com/redshift/latest/dg/r_CTAS_usage_notes.html
+), Amazon Redshift automatically assigns compression encoding as follows:
 
 * Columns that are defined as sort keys are assigned RAW compression.
 * Columns that are defined as BOOLEAN, REAL, or DOUBLE PRECISION, or GEOMETRY data types are assigned RAW compression.
 * Columns that are defined as SMALLINT, INTEGER, BIGINT, DECIMAL, DATE, TIMESTAMP, or TIMESTAMPTZ are assigned AZ64 compression.
 * Columns that are defined as CHAR or VARCHAR are assigned LZO compression.
 
-````
-https://docs.aws.amazon.com/redshift/latest/dg/r_CTAS_usage_notes.html
+{{% notice info %}}
 
-````
+
+{{% /notice %}}
 
 ```
 ANALYZE COMPRESSION workshop_das.taxi_201601
 ```
 
-Here's the output in case you want to use it:
-
-|Column|Encoding|Est_reduction_pct|
-|---|---|---|
-|vendorid|zstd|76.85|
-|pickup_datetime|az64|0.00|
-|dropoff_datetime|az64|0.00|
-|ratecode|zstd|74.49|
-|passenger_count|zstd|45.69|
-|trip_distance|zstd|73.49|
-|fare_amount|bytedict|85.90|
-|total_amount|zstd|75.38|
-|payment_type|az64|0.00|
-|year|zstd|90.51|
-|month|zstd|90.83|
-|type|zstd|89.94|
-
-
-### Complete populating the table
-Add to the January, 2016 table with an INSERT/SELECT statement for the other taxi companies.
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
-
-```python
-INSERT INTO workshop_das.taxi_201601 (
-  SELECT *
-  FROM adb305.ny_pub
-  WHERE year = 2016 AND month = 1 AND type != 'green');
-```
-
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
-
 ### Remove overlaps in the Spectrum table
 Now that we've loaded all January, 2016 data, we can remove the partitions from the Spectrum table so there is no overlap between the direct-attached storage (DAS) table and the Spectrum table.
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
 
 ```python
 ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='fhv');
 ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='green');
 ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='yellow');
 ```
-
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
+{{% notice info %}}
+This does not delete the data on S3.   You can query system table `svv_external_partitions` to see the active partitions for external tables.
+{{% /notice %}}
 
 ### Create a view with no Schema Binding
 Create a view **adb305_view_NYTaxiRides** from **workshop_das.taxi_201601** that allows seamless querying of the DAS and Spectrum data.
-
-{{< html.inline >}}
-<details><summary>Hint</summary>
-<p>
-{{< /html.inline >}}
 
 ```python
 CREATE VIEW adb305_view_NYTaxiRides AS
@@ -355,56 +262,22 @@ CREATE VIEW adb305_view_NYTaxiRides AS
 WITH NO SCHEMA BINDING;
 
 ```
+{{% notice info %}}
+The clause `WITH NO SCHEMA BINDING` is used to create a [late-binding view](https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_VIEW.html#r_CREATE_VIEW-parameters)
+A late-binding view doesn't check the underlying database objects, such as tables and other views, until the view is queried. As a result, you can alter or drop the underlying objects without dropping and recreating the view.
+{{% /notice %}}
 
-{{< html.inline >}}
-</p>
-</details>
-{{< /html.inline >}}
 
-### Is it Surprising this is valid SQL?
-
-* Note the use of the partition columns in the SELECT and WHERE clauses. Where were those columns in your Spectrum table definition?
-* Note the filters being applied either at the partition or file levels in the Spectrum portion of the query (versus the Redshift DAS section).
-* If you actually run the query (and not just generate the explain plan), does the runtime surprise you? Why or why not?
-
+Query against hot data in DAS.
 ````
-EXPLAIN
 SELECT year, month, type, COUNT(*)
 FROM adb305_view_NYTaxiRides
-WHERE year = 2016 AND month IN (1) AND passenger_count = 4
+WHERE year = 2016 AND month = 1 AND passenger_count = 4
 GROUP BY 1,2,3 ORDER BY 1,2,3;
 ````
 
-````
-QUERY PLAN
-XN Merge  (cost=1000090025653.20..1000090025653.21 rows=2 width=48)
-  Merge Key: derived_col1, derived_col2, derived_col3
-  ->  XN Network  (cost=1000090025653.20..1000090025653.21 rows=2 width=48)
-        Send to leader
-        ->  XN Sort  (cost=1000090025653.20..1000090025653.21 rows=2 width=48)
-              Sort Key: derived_col1, derived_col2, derived_col3
-              ->  XN HashAggregate  (cost=90025653.19..90025653.19 rows=2 width=48)
-                    ->  XN Subquery Scan adb305_view_nytaxirides  (cost=25608.12..90025653.17 rows=2 width=48)
-                          ->  XN Append  (cost=25608.12..90025653.15 rows=2 width=38)
-                                ->  XN Subquery Scan "*SELECT* 1"  (cost=25608.12..25608.13 rows=1 width=18)
-                                      ->  XN HashAggregate  (cost=25608.12..25608.12 rows=1 width=18)
-                                            ->  XN Seq Scan on t201601_pqt  (cost=0.00..25292.49 rows=31563 width=18)
-                                                  <b>Filter: ((passenger_count = 4) AND ("month" = 1) AND ("year" = 2016))</b>
-                                ->  XN Subquery Scan "*SELECT* 2"  (cost=90000045.00..90000045.02 rows=1 width=38)
-                                      ->  XN HashAggregate  (cost=90000045.00..90000045.01 rows=1 width=38)
-                                            ->  XN Partition Loop  (cost=90000000.00..90000035.00 rows=1000 width=38)
-                                                  ->  XN Seq Scan PartitionInfo of adb305.nytaxirides  (cost=0.00..15.00 rows=1 width=30)
-                                                       <b> Filter: (("month" = 1) AND ("year" = 2016))</b>
-                                                  ->  XN S3 Query Scan nytaxirides  (cost=45000000.00..45000010.00 rows=1000 width=8)
-                                                        ->  S3 Aggregate  (cost=45000000.00..45000000.00 rows=1000 width=0)
-                                                              ->  S3 Seq Scan adb305.nytaxirides location:"s3://us-west-2.serverless-analytics/canonical/NY-Pub" format:PARQUET  (cost=0.00..37500000.00 rows=3000000000 width=0)
-                                                                  <b> Filter: (passenger_count = 4)</b>
-````
-
-* Now include Spectrum data by adding a month whose data is in Spectrum
-
-````
-EXPLAIN
+Now let's add data from the data lake.
+```
 SELECT year, month, type, COUNT(*)
 FROM adb305_view_NYTaxiRides
 WHERE year = 2016 AND month IN (1,2) AND passenger_count = 4
@@ -412,245 +285,19 @@ GROUP BY 1,2,3 ORDER BY 1,2,3;
 
 ````
 
-````
-QUERY PLAN
-XN Merge  (cost=1000090029268.92..1000090029268.92 rows=2 width=48)
-  Merge Key: derived_col1, derived_col2, derived_col3
-  ->  XN Network  (cost=1000090029268.92..1000090029268.92 rows=2 width=48)
-        Send to leader
-        ->  XN Sort  (cost=1000090029268.92..1000090029268.92 rows=2 width=48)
-              Sort Key: derived_col1, derived_col2, derived_col3
-              ->  XN HashAggregate  (cost=90029268.90..90029268.90 rows=2 width=48)
-                    ->  XN Subquery Scan adb305_view_nytaxirides  (cost=29221.33..90029268.88 rows=2 width=48)
-                          ->  XN Append  (cost=29221.33..90029268.86 rows=2 width=38)
-                                ->  XN Subquery Scan "*SELECT* 1"  (cost=29221.33..29221.34 rows=1 width=18)
-                                      ->  XN HashAggregate  (cost=29221.33..29221.33 rows=1 width=18)
-                                            ->  XN Seq Scan on t201601_pqt  (cost=0.00..28905.70 rows=31563 width=18)
-                                                 <b> Filter: ((passenger_count = 4) AND ("year" = 2016) AND (("month" = 1) OR ("month" = 2))) </b>
-                                ->  XN Subquery Scan "*SELECT* 2"  (cost=90000047.50..90000047.52 rows=1 width=38)
-                                      ->  XN HashAggregate  (cost=90000047.50..90000047.51 rows=1 width=38)
-                                            ->  XN Partition Loop  (cost=90000000.00..90000037.50 rows=1000 width=38)
-                                                  ->  XN Seq Scan PartitionInfo of adb305.nytaxirides  (cost=0.00..17.50 rows=1 width=30)
-                                                       <b> Filter: (("year" = 2016) AND (("month" = 1) OR ("month" = 2)))</b>
-                                                  ->  XN S3 Query Scan nytaxirides  (cost=45000000.00..45000010.00 rows=1000 width=8)
-                                                        ->  S3 Aggregate  (cost=45000000.00..45000000.00 rows=1000 width=0)
-                                                              ->  S3 Seq Scan adb305.nytaxirides location:"s3://us-west-2.serverless-analytics/canonical/NY-Pub" format:PARQUET  (cost=0.00..37500000.00 rows=3000000000 width=0)
-                                                                  <b> Filter: (passenger_count = 4)</b>
-````
+{{% notice note %}}
+Feel free to experiment and examine the EXPLAIN plans for the queries using the **Execution** button in the Query Editor
 
-````
-EXPLAIN
-SELECT passenger_count, COUNT(*)
-FROM adb305.ny_pub
-WHERE year = 2016 AND month IN (1,2)
-GROUP BY 1 ORDER BY 1;
-````
+{{% /notice %}}
 
-````
-QUERY PLAN
-XN Merge  (cost=1000090005026.64..1000090005027.14 rows=200 width=12)
-  <b>Merge Key: nytaxirides.derived_col1</b>
-  ->  XN Network  (cost=1000090005026.64..1000090005027.14 rows=200 width=12)
-        Send to leader
-        ->  XN Sort  (cost=1000090005026.64..1000090005027.14 rows=200 width=12)
-              <b>Sort Key: nytaxirides.derived_col1</b>
-              ->  XN HashAggregate  (cost=90005018.50..90005019.00 rows=200 width=12)
-                    ->  XN Partition Loop  (cost=90000000.00..90004018.50 rows=200000 width=12)
-                          ->  XN Seq Scan PartitionInfo of adb305.nytaxirides  (cost=0.00..17.50 rows=1 width=0)
-                               Filter: (("year" = 2016) AND (("month" = 1) OR ("month" = 2)))
-                          ->  XN S3 Query Scan nytaxirides  (cost=45000000.00..45002000.50 rows=200000 width=12)
-                                <b> ->  S3 HashAggregate  (cost=45000000.00..45000000.50 rows=200000 width=4)</b>
-                                      ->  S3 Seq Scan adb305.nytaxirides location:"s3://us-west-2.serverless-analytics/canonical/NY-Pub" format:PARQUET  (cost=0.00..30000000.00 rows=3000000000 width=4)
-````
+## Aging Data
+Data can be aged from hot to warm storage using the SQL command [UNLOAD](https://docs.aws.amazon.com/redshift/latest/dg/r_UNLOAD.html)
 
-````
-EXPLAIN
-SELECT type, COUNT(*)
-FROM adb305.ny_pub
-WHERE year = 2016 AND month IN (1,2)
-GROUP BY 1 ORDER BY 1 ;
-````
-
-````
-QUERY PLAN
-XN Merge  (cost=1000075000042.52..1000075000042.52 rows=1 width=30)
-  <b>Merge Key: nytaxirides."type"</b>
-  ->  XN Network  (cost=1000075000042.52..1000075000042.52 rows=1 width=30)
-        Send to leader
-        ->  XN Sort  (cost=1000075000042.52..1000075000042.52 rows=1 width=30)
-              <b>Sort Key: nytaxirides."type"</b>
-              ->  XN HashAggregate  (cost=75000042.50..75000042.51 rows=1 width=30)
-                    ->  XN Partition Loop  (cost=75000000.00..75000037.50 rows=1000 width=30)
-                          ->  XN Seq Scan PartitionInfo of adb305.nytaxirides  (cost=0.00..17.50 rows=1 width=22)
-                               Filter: (("year" = 2016) AND (("month" = 1) OR ("month" = 2)))
-                          ->  XN S3 Query Scan nytaxirides  (cost=37500000.00..37500010.00 rows=1000 width=8)
-                              <b>  ->  S3 Aggregate  (cost=37500000.00..37500000.00 rows=1000 width=0)</b>
-                                      ->  S3 Seq Scan adb305.nytaxirides location:"s3://us-west-2.serverless-analytics/canonical/NY-Pub" format:PARQUET  (cost=0.00..30000000.00 rows=3000000000 width=0)
-````
-
-## Plan for the Future
-In this final part of this lab, we will compare different strategies for maintaining more recent or *HOT* data within Redshift direct-attached storage, and keeping older *COLD* data in S3 by performing the following steps:
-* Allow for trailing 5 quarters reporting by adding the Q4 2015 data to Redshift DAS:
-	* Anticipating that we’ll want to ”age-off” the oldest quarter on a 3 month basis, architect your DAS table to make this easy to maintain and query.
-	* Adjust your Redshift Spectrum table to exclude the Q4 2015 data.
-* Develop and execute a plan to move the Q4 2015 data to S3.
-	* What are the discrete steps to be performed?
-	* What extra-Redshift functionality must be leveraged?
-	* Simulating the extra-Redshift steps with the existing Parquet data, age-off the Q4 2015 data from Redshift DAS 	and perform any needed steps to maintain a single version of the truth.
-
-* There are several options to accomplish this goal. Anticipating that we’ll want to ”age-off” the oldest quarter on a 3 month basis, architect your DAS table to make this easy to maintain and query. How about something like this?
-
-````
-CREATE OR REPLACE VIEW adb305_view_NYTaxiRides AS
-  SELECT * FROM workshop_das.taxi_201504
-UNION ALL
-  SELECT * FROM workshop_das.taxi_201601
-UNION ALL
-  SELECT * FROM workshop_das.taxi_201602
-UNION ALL
-  SELECT * FROM workshop_das.taxi_201603
-UNION ALL
-  SELECT * FROM workshop_das.taxi_201604
-UNION ALL
-  SELECT * FROM adb305.ny_pub
-WITH NO SCHEMA BINDING;
-````
-
-* Or something like this? Bulk DELETE-s in Redshift are actually quite fast (with one-time single-digit minute time to VACUUM), so this is also a valid configuration as well:
-
-````
-CREATE OR REPLACE VIEW adb305_view_NYTaxiRides AS
-   SELECT * FROM workshop_das.taxi_current
-UNION ALL
-  SELECT * FROM adb305.ny_pub
-WITH NO SCHEMA BINDING;
-````
-
-* If needed, the Redshift DAS tables can also be populated from the Parquet data with COPY. Note: This will highlight a data design when we created the Parquet data
-
-**COPY with Parquet doesn’t currently include a way to specify the partition columns as sources to populate the target Redshift DAS table. The current expectation is that since there’s no overhead (performance-wise) and little cost in also storing the partition data as actual columns on S3, customers will store the partition column data as well.**
-
-* We’re going to show how to work with the scenario where this pattern wasn’t followed. Use the single table option for this example
-
-````
-CREATE TABLE workshop_das.taxi_current
-DISTSTYLE EVEN
-SORTKEY(year, month, type) AS
-SELECT * FROM adb305.ny_pub WHERE 1 = 0;
-````
-
-* And, create a helper table that doesn't include the partition columns from the Redshift Spectrum table.
-
-````
-CREATE TABLE workshop_das.taxi_loader AS
-  SELECT vendorid, pickup_datetime, dropoff_datetime, ratecode, passenger_count,
-  	trip_distance, fare_amount, total_amount, payment_type
-  FROM workshop_das.taxi_current
-  WHERE 1 = 0;
-````
-
-### Parquet copy continued
-
-* The population could be scripted easily; there are also a few different patterns that could be followed.  Below is a script which issues a seperate copy command for each partition where the **type=green**.  Once complete, seperate scripts would need to be used for other **type** partitions.
-
-````
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2015/month=10/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2015/month=11/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2015/month=12/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=1/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=2/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=3/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=4/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=5/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=6/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=7/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=8/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=9/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=10/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=11/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-COPY workshop_das.taxi_loader FROM 's3://us-west-2.serverless-analytics/canonical/NY-Pub/year=2016/month=12/type=green' IAM_ROLE 'arn:aws:iam::[Your-AWS-Account_Id]:role/[Your-Redshift_Role]' FORMAT AS PARQUET;
-````
-
-````
-INSERT INTO workshop_das.taxi_current
-  SELECT *, DATE_PART(year,pickup_datetime), DATE_PART(month,pickup_datetime), 'green'
-  FROM workshop_das.taxi_loader;
-````
-
-````
-TRUNCATE workshop_das.taxi_loader;
-````
-
-### Redshift Spectrum can, of course, also be used to populate the table(s).
-
-````
-DROP TABLE IF EXISTS workshop_das.taxi_201601;
-CREATE TABLE workshop_das.taxi_201601 AS SELECT * FROM adb305.ny_pub WHERE year = 2016 AND month IN (1,2,3);
-CREATE TABLE workshop_das.taxi_201602 AS SELECT * FROM adb305.ny_pub WHERE year = 2016 AND month IN (4,5,6);
-CREATE TABLE workshop_das.taxi_201603 AS SELECT * FROM adb305.ny_pub WHERE year = 2016 AND month IN (7,8,9);
-CREATE TABLE workshop_das.taxi_201604 AS SELECT * FROM adb305.ny_pub WHERE year = 2016 AND month IN (10,11,12);
-````
-
-### Adjust your Redshift Spectrum table to exclude the Q4 2015 data
-
-**Note for the Redshift Editor users:** Adjust accordingly based on how many of the partitions you added above.
-
-````
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=10, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=10, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=10, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=11, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=11, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=11, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=12, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=12, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2015, month=12, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=1, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=2, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=2, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=2, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=3, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=3, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=3, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=4, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=4, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=4, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=5, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=5, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=5, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=6, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=6, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=6, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=7, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=7, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=7, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=8, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=8, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=8, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=9, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=9, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=9, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=10, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=10, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=10, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=11, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=11, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=11, type='green');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=12, type='yellow');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=12, type='fhv');
-ALTER TABLE adb305.ny_pub DROP PARTITION(year=2016, month=12, type='green');
-````
-
-* Now, regardless of method, there’s a view covering the trailing 5 quarters in Redshift DAS, and all of time on Redshift Spectrum, completely transparent to users of the view. What would be the steps to “age-off” the Q4 2015 data?
-
-	1. Put a copy of the data from Redshift DAS table to S3. What would be the command(s)?
-		* UNLOAD
-	1. Extend the Redshift Spectrum table to cover the Q4 2015 data with Redshift Spectrum.
-		* ADD Partition.
-	1. Remove the data from the Redshift DAS table:
-		* Either DELETE or DROP TABLE (depending on the implementation).
-
-## Before You Leave
-If you are done using your cluster, please think about decommissioning it to avoid having to pay for unused resources.
+For example:
+```
+UNLOAD ('select-statement')
+TO 's3://my-s3-bucket/data'
+FORMAT AS PARQUET
+PARTITION BY (year, month, type)
+ESCAPE
+```

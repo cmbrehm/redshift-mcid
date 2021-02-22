@@ -1,9 +1,4 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters:
-  PortNumber:
-    Description: The port number on which the cluster accepts incoming connections.
-    Type: Number
-    Default: '5439'
 Resources:
   RedshiftRole:
     Type: AWS::IAM::Role
