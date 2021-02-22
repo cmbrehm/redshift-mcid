@@ -18,20 +18,19 @@ pre = "<b>1. </b>"
 In this lab you will launch a new Redshift Cluster, setup connectivity and configure a JDBC Client tool.
 
 ## Contents
-* [Before You Begin](#before-you-begin)
-* [Cloud Formation](#cloud-formation)
-* [Configure Security](#configure-security)
-* [Launch Redshift Cluster ](#launch-redshift-cluster)
-* [Configure Client Tool](#configure-client-tool)
-* [Run Sample Query](#run-sample-query)
-* [Before You Leave](#before-you-leave)
+- [Contents](#contents)
+- [Before You Begin](#before-you-begin)
+- [Configure Security](#configure-security)
+  - [Security Group](#security-group)
+- [Launch Redshift Cluster](#launch-redshift-cluster)
+- [Run Sample Query](#run-sample-query)
 
 ## Before You Begin
 * Determine and capture the following information and login to the [AWS Console](https://console.aws.amazon.com/). If you are new to AWS, you can [create an account](https://portal.aws.amazon.com/billing/signup).
   * [Your-AWS_Account_Id]
   * [Your_AWS_User_Name]
   * [Your_AWS_Password]
-* Determine the [AWS Region Name] and [AWS Region Id] which is closest to you and switch your console to that [Region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html).  
+* This lab will leverage the us-west-2 AWS Region (Oregon).  In the top-right corner, switch the AWS console to us-west-2.  
 
 ## Configure Security
 {{% notice info %}}
@@ -81,8 +80,10 @@ Wait for the cluster to become **Available**.  Select it with the selection box 
 select * from pg_user
 ```
 * Click **Connect and Run** to open the connection box.
-* Enter the *database name (dev)* and *user name (aws_user)* in the dialog that opens
+* Enter the *database name (dev)* and *user name (awsuser)* in the dialog that opens
 * Click **Connect**
 
 * If you receive the following results, you have established connectivity and this lab is complete.  
-![](../images/Users.png)
+
+{{< html.inline >}}<img src=../images/Users.png class=box><img src=../images/Users2.png class=box>{{< /html.inline >}}
+{{< html.inline >}}{{< /html.inline >}}
