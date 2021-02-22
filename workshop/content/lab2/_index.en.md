@@ -8,12 +8,12 @@ pre = "<b>2. </b>"
 In this lab, you will use a set of eight tables based on the TPC Benchmark data model.  You create these tables within your Redshift cluster and load these tables with sample data stored in S3.  
 
 ## Contents
-* [Create Tables](#create-tables)
-* [Loading Data](#loading-data)
-* [Table Maintenance - ANALYZE](#table-maintenance---analyze)
-* [Table Maintenance - VACUUM](#table-maintenance---vacuum)
-* [Troubleshooting Loads](#troubleshooting-loads)
-* [Before You Leave](#before-you-leave)
+- [Contents](#contents)
+- [Create Tables](#create-tables)
+- [Loading Data](#loading-data)
+- [Table Maintenance - ANALYZE](#table-maintenance---analyze)
+- [Table Maintenance - VACUUM](#table-maintenance---vacuum)
+- [Troubleshooting Loads](#troubleshooting-loads)
 
 ## Create Tables
 
@@ -175,12 +175,12 @@ This load should finish in about 15 minutes.  You can monitor the progress in th
 {{% /notice %}}
 Note: A few key takeaways from the above COPY statements.
 1. COMPUPDATE PRESET ON will assign compression using the Amazon Redshift best practices related to the data type of the column but without analyzing the data in the table.
-1. COPY for the REGION table points to a specfic file (region.tbl.lzo) while COPY for other tables point to a prefix to multiple files (lineitem.tbl.)
+1. COPY for the REGION table points to a specific file (region.tbl.lzo) while COPY for other tables point to a prefix to multiple files (lineitem.tbl.)
 1. COPY for the SUPPLIER table points a manifest file (supplier.json)
 
 
 
-## Table Maintenance - Analyze
+## Table Maintenance - ANALYZE
 You should at regular intervals, update the statistical metadata that the query planner uses to build and choose optimal plans.  You can analyze a table explicitly by running the ANALYZE command.  When you load data with the COPY command, you can perform an analysis on incrementally loaded data automatically by setting the STATUPDATE option to ON.  When loading into an empty table, the COPY command by default performs the ANALYZE operation.
 
 Run the ANALYZE command against the CUSTOMER table.
@@ -239,7 +239,7 @@ Run the VACUUM command
 vacuum delete only orders;
 ```
 
-Confirm that the VACUUM command reclaimed space by running the follwoing quer again and noting the values have changed.
+Confirm that the VACUUM command reclaimed space by running the following query again and noting the values have changed.
 ```
 select sum(blocks) as total_space from
 (select col, count(*) as blocks
