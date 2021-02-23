@@ -163,7 +163,7 @@ Today, we will use the AWS Glue Crawler to create your external table adb305.ny_
 	![](../images/crawler_2.png)
 	1. Choose *S3* as the data store and the include path of *s3://us-west-2.serverless-analytics/canonical/NY-Pub*
 	![](../images/crawler_3.png)
-	1. *Create an IAM Role* and enter the name AWSGlueServiceRole-*RedshiftImmersion*.  
+	1. *Choose an existing IAM role* and select *AWSGlueServiceRole-ImmersionDay*.  
 	![](../images/crawler_4.png)
 	1. Select *Run on demand* for the frequency.
 	![](../images/crawler_5.png)
