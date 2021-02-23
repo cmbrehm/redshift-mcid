@@ -1,5 +1,30 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Resources:
+  GlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSGlueServiceRole-ImmersionDay
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /service-role/
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: NY-Taxi-S3-Read
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - arn:aws:s3:::us-west-2.serverless-analytics/canonical/NY-Pub*
   RedshiftRole:
     Type: AWS::IAM::Role
     Properties :
@@ -67,8 +92,3 @@ Resources:
         Ref: Subnet
       RouteTableId:
         Ref: RouteTable
-Outputs:
-  RedshiftClusterSubnetGroupName:
-    Description: Name of cluster subnet group
-    Value:
-      Ref: RedshiftClusterSubnetGroup
