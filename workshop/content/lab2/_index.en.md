@@ -129,7 +129,7 @@ diststyle even;
 The tables should appear as Resources.
 
 ## Loading Data
-A COPY command loads large amounts of data much more efficiently than using INSERT statements, and stores the data more effectively as well.  Use a single COPY command to load data for one table from multiple files.  Amazon Redshift then automatically loads the data in parallel.  For your convenience, the sample data you will use is available in a public Amazon S3 bucket. To ensure that  Redshift performs a compression analysis, set the COMPUPDATE parameter to ON in your COPY commands. To copy this data you will need to replace the [Your-AWS_Account_Id] and [Your-Redshift_Role] values in the script below.
+A COPY command loads large amounts of data much more efficiently than using INSERT statements, and stores the data more effectively as well.  Use a single COPY command to load data for one table from multiple files.  Amazon Redshift then automatically loads the data in parallel.  For your convenience, the sample data you will use is available in a public Amazon S3 bucket. To ensure that  Redshift performs a compression analysis, set the COMPUPDATE parameter to ON in your COPY commands. To copy this data you will need to replace the [Your-AWS_Account_Id] value in the script below.
 
 ```
 COPY region FROM 's3://redshift-immersionday-labs/data/region/region.tbl.lzo'
@@ -144,10 +144,6 @@ copy customer from 's3://redshift-immersionday-labs/data/customer/customer.tbl.'
 iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
-copy orders from 's3://redshift-immersionday-labs/data/orders/orders.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
-region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
-
 copy part from 's3://redshift-immersionday-labs/data/part/part.tbl.'
 iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
@@ -156,27 +152,22 @@ copy supplier from 's3://redshift-immersionday-labs/data/supplier/supplier.json'
 iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
 region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 
-copy partsupp from 's3://redshift-immersionday-labs/data/partsupp/partsupp.tbl.'
-iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
-region 'us-west-2' lzop delimiter '|' COMPUPDATE PRESET;
 ```
 The estimated time to load the data is as follows:
 
 * REGION (5 rows) - 20s
 * NATION (25 rows) - 20s
 *	CUSTOMER (15M rows) – 3m
-* ORDERS - (76M rows) - 1m
 * PART - (20M rows) - 4m
 *	SUPPLIER - (1M rows) - 1m
-*	PARTSUPPLIER - (80M rows) 3m
 
 {{% notice note %}}
 This load should finish in about 15 minutes.  You can monitor the progress in the queries tab on the left menu bar
 {{% /notice %}}
 Note: A few key takeaways from the above COPY statements.
 1. COMPUPDATE PRESET ON will assign compression using the Amazon Redshift best practices related to the data type of the column but without analyzing the data in the table.
-1. COPY for the REGION table points to a specific file (region.tbl.lzo) while COPY for other tables point to a prefix to multiple files (lineitem.tbl.)
-1. COPY for the SUPPLIER table points a manifest file (supplier.json)
+2. COPY for the REGION table points to a specific file (region.tbl.lzo) while COPY for other tables point to a prefix to multiple files (lineitem.tbl.)
+3. COPY for the SUPPLIER table points a manifest file (supplier.json)
 
 
 
@@ -208,18 +199,18 @@ select sum(blocks) as total_space from
 from stv_blocklist, stv_tbl_perm
 where stv_blocklist.tbl = stv_tbl_perm.id and
 stv_blocklist.slice = stv_tbl_perm.slice and
-stv_tbl_perm.name = 'orders'
+stv_tbl_perm.name = 'part'
 group by col
-)
+);
 ```
 
 {{% notice note %}}
 STV_BLOCKLIST contains the number of 1 MB disk blocks that are used by each slice, table, or column in a database.  Use aggregate queries with STV_BLOCKLIST, as the following examples show, to determine the number of 1 MB disk blocks allocated per database, table, slice, or column.
 {{% /notice %}}
 
-Delete rows from the ORDERS table.
+Delete rows from the PART table.
 ```
-delete orders where o_orderdate between '1997-01-01' and '1998-01-01';
+delete from part where p_mfgr <= 'Manufacturer#4';
 ```
 
 Confirm that Redshift did not automatically reclaim space by running the following query again and noting the values have not changed.
@@ -229,14 +220,14 @@ select sum(blocks) as total_space from
 from stv_blocklist, stv_tbl_perm
 where stv_blocklist.tbl = stv_tbl_perm.id and
 stv_blocklist.slice = stv_tbl_perm.slice and
-stv_tbl_perm.name = 'orders'
+stv_tbl_perm.name = 'part'
 group by col
-)
+);
 ```
 
 Run the VACUUM command
 ```
-vacuum delete only orders;
+vacuum delete only part;
 ```
 
 Confirm that the VACUUM command reclaimed space by running the following query again and noting the values have changed.
@@ -246,9 +237,9 @@ select sum(blocks) as total_space from
 from stv_blocklist, stv_tbl_perm
 where stv_blocklist.tbl = stv_tbl_perm.id and
 stv_blocklist.slice = stv_tbl_perm.slice and
-stv_tbl_perm.name = 'orders'
+stv_tbl_perm.name = 'part'
 group by col
-)
+);
 ```
 
 
@@ -261,7 +252,7 @@ There are two Amazon Redshift system tables that can be helpful in troubleshooti
 
 In addition, you can validate your data without actually loading the table.  Use the NOLOAD option with the COPY command to make sure that your data file will load without any errors before running the actual data load.  Running COPY with the NOLOAD option is much faster than loading the data since it only parses the files.
 
-Let’s try to load the CUSTOMER table with a different data file with mismatched columns.  To copy this data you will need to replace the [Your-AWS_Account_Id] and [Your-Redshift_Role] values in the script below.   
+Let’s try to load the CUSTOMER table with a different data file with mismatched columns.  To copy this data you will need to replace the [Your-AWS_Account_Id] and value in the script below.   
 ```
 COPY customer FROM 's3://redshift-immersionday-labs/data/nation/nation.tbl.'
 iam_role 'arn:aws:iam::[Your-AWS_Account_Id]:role/RedshiftImmersionRole'
