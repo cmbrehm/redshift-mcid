@@ -75,15 +75,24 @@ Leave the remaining settings with their default values.  Click **Create Cluster*
 
 ## Run Sample Query
 Wait for the cluster to become **Available**.  Select it with the selection box next to it and click **Query cluster** to open the query interface.
+
+For this Immersion Day, we will leverage the old version of Query Editor.  To open query editor,
+
+1. Select Query Editor from the left hand side
+2. Click on "old query editor" in the blue notification at the top of the screen
+
+{{< html.inline >}}<img src=../images/lab1-query-editor-1.png class=box><img src=../images/lab1-query-editor-2.png class=box> {{< /html.inline >}}
+
+
+* Click **Connect to Database**, enter in database information, and click **Connect to Database** 
+
+{{< html.inline >}}<img src=../images/lab1-query-editor-3.png class=box>{{< /html.inline >}}
+
 * Run the following query to list the users within the redshift cluster.  
 ```
 select * from pg_user
 ```
-* Click **Connect and Run** to open the connection box.
-* Enter the *database name (dev)* and *user name (awsuser)* in the dialog that opens
-* Click **Connect**
 
 * If you receive the following results, you have established connectivity and this lab is complete.  
 
-{{< html.inline >}}<img src=../images/Users.png class=box><img src=../images/Users2.png class=box>{{< /html.inline >}}
-{{< html.inline >}}{{< /html.inline >}}
+{{< html.inline >}}<img src=../images/Users3.png class=box>{{< /html.inline >}}
