@@ -29,3 +29,5 @@ arn:aws:iam::aws:policy/AmazonRedshiftFullAccess
 ```
 
 Save the module and you can use it as the only one in the Event Engine blueprint
+
+**NOTE** The `redshift-data` API isn't supported today under EventEngine, [see this ticket](https://issues.amazon.com/issues/EE-PFR-298)
