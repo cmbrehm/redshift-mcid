@@ -23,7 +23,7 @@ The query editor only runs short queries that can complete within 10 minutes. Qu
 
 Copy the following create table statements to create tables in the database mimicking the TPC Benchmark data model.
 
-![](../images/Model.png)
+![](images/Model.png)
 
 ```
 DROP TABLE IF EXISTS partsupp;

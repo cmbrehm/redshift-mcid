@@ -17,20 +17,25 @@ In this lab, we show you how to combine "hot" data stored in Amazon Redshift wit
 ## Inspect The Data
 The data we'll use for this lab is stored in a public S3 bucket and represents rideshare data from a few different companies.  Note the partitioning scheme is Year, Month, Type (where Type is a taxi company).  Inspect the data and understand the partitioning.  Note the data has already been translated to parquet format so will not be easy to read.
 
-Here's a quick Screenshot:
+**Note the partitioning scheme is Year, Month, Type (where Type is a taxi company). Here's a quick Screenshot:**
 
 ```
 https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/
 ```
-![](../images/canonical_year.png)
+
+![](images/canonical_year.png)
+
 ```
 https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/
 ```
-![](../images/canonical_month.png)
+
+![](images/canonical_month.png)
+
 ```
 https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/month%253D1/
 ```
-![](../images/canonical_type.png)
+
+![](images/canonical_type.png)
 
 
 ## COPY Data from S3
@@ -38,16 +43,20 @@ In the first part of this lab, we will perform the following activities:
 * Load the Green company data for January 2016 into Redshift direct-attached storage (DAS) with COPY.
 * Collect supporting/refuting evidence for the impact of the January, 2016 blizzard on taxi usage.
 * The CSV data is by month on Amazon S3. Here's a quick screenshot from the S3 console:
+
 ````
 https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/NYC-Pub/green/?region=us-west-2&tab=overview&prefixSearch=green_tripdata_2016
 ````
-![](../images/green_2016.png)
+
+![](images/green_2016.png)
 
 * Here's Sample data from one file which can be previewed directly in the S3 console:
+
 ````
 https://s3.console.aws.amazon.com/s3/object/us-west-2.serverless-analytics/NYC-Pub/green/green_tripdata_2013-08.csv?region=us-west-2&tab=select
 ````
-![](../images/green_preview.png)
+
+![](images/green_preview.png)
 
 
 ### Build your DDL
@@ -131,22 +140,6 @@ In the next part of this lab, we will perform the following activities:
 * Onboard "warm" historical data residing on S3 by building an external DB for Redshift Spectrum.
 * Introspect the historical data, perhaps rolling-up the data in novel ways to see trends over time, or other dimensions.
 
-**Note the partitioning scheme is Year, Month, Type (where Type is a taxi company). Here's a quick Screenshot:**
-
-```
-https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/
-```
-![](../images/canonical_year.png)
-```
-https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/
-```
-![](../images/canonical_month.png)
-```
-https://s3.console.aws.amazon.com/s3/buckets/us-west-2.serverless-analytics/canonical/NY-Pub/year%253D2016/month%253D1/
-```
-
-![](../images/canonical_type.png)
-
 
 ### Use an AWS Glue Crawler to index the data lake
 [AWS Glue](https://aws.amazon.com/glue) is a serverless data integration service that makes it easy to discover, prepare, and combine data for analytics, machine learning, and application development. AWS Glue crawls your data sources, identifies data formats, and suggests schemas to store your data. It automatically generates the code to run your data transformations and loading processes.
@@ -155,43 +148,43 @@ Today, we will use the AWS Glue Crawler to create your external table `adb305.ny
 
 1. Navigate to the [**Glue Crawler Page**](https://console.aws.amazon.com/glue/home?#catalog:tab=crawlers)
 
-  ![](../images/crawler_0.png)
+  ![](images/crawler_0.png)
 
 1. Click on *Add Crawler*, and enter the crawler name *NYTaxiCrawler* and click *Next*.
 
-	![](../images/crawler_1.png)
+	![](images/crawler_1.png)
 
 1. Select *Data stores* as the source type and click *Next*.
 
-	![](../images/crawler_2.png)
+	![](images/crawler_2.png)
 
 1. Choose *S3* as the data store and the include path of *s3://us-west-2.serverless-analytics/canonical/NY-Pub*
 
-	![](../images/crawler_3.png)
+	![](images/crawler_3.png)
 
 1. *Choose an existing IAM role* and select *AWSGlueServiceRole-ImmersionDay*.  
 
-	![](../images/crawler_4.png)
+	![](images/crawler_4.png)
 
 1. Select *Run on demand* for the frequency.
 
-  ![](../images/crawler_5.png)
+  ![](images/crawler_5.png)
 
 1. Click on *Add database* and enter the Database of *spectrumdb*
 
-	![](../images/crawler_6.png)
+	![](images/crawler_6.png)
 
 1. Select all remaining defaults. Once the Crawler has been created, click on *Run Crawler*.
 
-	![](../images/crawler_7.png)
+	![](images/crawler_7.png)
 
 1. Once the Crawler has completed its run (should only take a minute or two), you will see a new table in the Glue Catalog. https://console.aws.amazon.com/glue/home?#catalog:tab=tables
 
-	![](../images/crawler_8.png)
+	![](images/crawler_8.png)
 
 1. Click on the *ny_pub* table, notice the recordCount of 2.87 billion.
 
-	![](../images/crawler_9.png)
+	![](images/crawler_9.png)
 
 
 ### Create external schema (and DB) for Redshift Spectrum
@@ -218,7 +211,7 @@ GROUP BY 1
 ORDER BY 1;
 ```
 How long did this query take?  Check the **Execution timeline** for details
-![](../images/lab4-spectrum-execution.png)
+![](images/lab4-spectrum-execution.png)
 
 {{% notice info %}}
 With Redshift Spectrum, you are billed per terabyte of data scanned, rounded up to the next megabyte, with a 10 megabyte minimum per query.  Prices vary by region but start at $5.00 USD per terabyte in the US regions.  For example, if you scan 10 gigabytes of data, you will be charged $0.05. If you scan 1 terabyte of data, you will be charged $5.00.  

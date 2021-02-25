@@ -42,9 +42,9 @@ Create a **Security Group** associated to the VPC.  Edit the Security Group to c
 ```
 https://console.aws.amazon.com/vpc/home#SecurityGroups:sort=groupId
 ```
-![](../images/SecurityGroup.png)
-![](../images/SecurityGroup_1.png)
-![](../images/SecurityGroup_2.png)
+{{< html.inline >}}<img src=images/SecurityGroup.png class=box>{{< /html.inline >}}
+{{{< html.inline >}}<img src=images/SecurityGroup_1.png class=box>{{< /html.inline >}}
+{{< html.inline >}}<img src=images/SecurityGroup_2.png class=box>{{< /html.inline >}}
 
 ## Launch Redshift Cluster
 Finally, navigate to the **Amazon Redshift Dashboard** and click on the "Create Cluster" button.  
@@ -52,17 +52,16 @@ Finally, navigate to the **Amazon Redshift Dashboard** and click on the "Create 
 https://console.aws.amazon.com/redshiftv2/home?#clusters
 ```
 * Cluster Configuration - Select "Free Trial" for a one-node dc2.large cluster.  This will be sufficient for today's lab.
-![](../images/CreateCluster1.png)
-{{< html.inline >}}<img src=../images/CreateCluster1.png class=box>{{< /html.inline >}}
+{{< html.inline >}}<img src=images/CreateCluster1.png class=box>{{< /html.inline >}}
 
 * Cluster Details - Enter values as appropriate for your organization.  
 {{% notice warning %}}
 Note the Master user password as you will not be able to retrieve this value later.
 {{% /notice %}}
-![](../images/CreateCluster2.png)
+{{< html.inline >}}<img src=images/CreateCluster2.png class=box>{{< /html.inline >}}
 
 * Cluster Permissions - Select RedshiftImmersionRole from the **Available IAM Role** dropdown  and click **Associate IAM role**
-![](../images/CreateCluster3.png)
+{{< html.inline >}}<img src=images/CreateCluster3.png class=box>{{< /html.inline >}}
 
 * Additional Configuration - Disable **Use defaults** and set **Publicly Accessible** to true.
 
@@ -70,7 +69,7 @@ Note the Master user password as you will not be able to retrieve this value lat
 Once again, please don't do this in any environment that's more important than a sandbox.
 {{% /notice %}}
 
-![](../images/CreateCluster4.png)
+{{< html.inline >}}<img src=images/CreateCluster4.png class=box>{{< /html.inline >}}
 
 Leave the remaining settings with their default values.  Click **Create Cluster** to launch the Redshift cluster.
 
@@ -82,12 +81,12 @@ For this Immersion Day, we will leverage the old version of Query Editor.  To op
 1. Select Query Editor from the left hand side
 2. Click on "old query editor" in the blue notification at the top of the screen
 
-![](../images/lab1-query-editor-1.png)
-![](../images/lab1-query-editor-2.png)
+{{< html.inline >}}<img src=images/lab1-query-editor-1.png class=box><img src=../images/lab1-query-editor-2.png class=box> {{< /html.inline >}}
+
 
 * Click **Connect to Database**, enter in database information, and click **Connect to Database**
 
-![](../images/lab1-query-editor-3.png)
+{{< html.inline >}}<img src=images/lab1-query-editor-3.png class=box>{{< /html.inline >}}
 
 * Run the following query to list the users within the redshift cluster.  
 ```
@@ -96,4 +95,4 @@ select * from pg_user
 
 * If you receive the following results, you have established connectivity and this lab is complete.  
 
-![](../images/Users3.png)
+{{< html.inline >}}<img src=images/Users3.png class=box>{{< /html.inline >}}
